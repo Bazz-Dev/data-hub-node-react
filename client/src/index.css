@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom root variables (optional) */
+:root {
+  --color-primary: #FF7000;
+}

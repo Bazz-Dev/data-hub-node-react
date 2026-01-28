@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Data Hub</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#FF7000",
+              background: "#FFFFFF",
+              surface: "#FFFFFF",
+              text: "#111827",
+              muted: "#6B7280"
+            },
+            boxShadow: {
+              soft: "0 8px 30px rgba(17,24,39,0.08)"
+            }
+          }
+        }
+      }
+    </script>
+  </head>
+  <body class="bg-background text-text">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

@@ -1,0 +1,1188 @@
+id;Nombre;Tags;SQL
+q1-cambios-y-devoluciones;Cambios y Devoluciones;Customer Care;"WITH CTE AS (
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY ID_REG ORDER BY ID_REG) AS row_num
+FROM (
+SELECT  CONCAT(pipcciap.NUMERO_PEDIDO, pipcciap.SKU, pipcciap.NUM_PRODUCTO_PEDIDO) AS ID_REG,
+        pipcciap.NUMERO_PEDIDO,
+        pipcciap.FECHA_PEDIDO,
+        pipcciap.FECHA_FACTURACION,
+        pipcciap.CICLO_PEDIDO,
+        pipcciap.CODIGO_GERENCIA,   -- Código gerencia de ventas
+        pipcciap.NOMBRE_GERENCIA,       -- Nombre gerencia de ventas
+        --pipcciap.CODIGO_GERENTE,    -- Código gerente de ventas
+        --pipcciap.NOMBRE_GERENTE,     -- Nombre gerente de ventas
+        pipcciap.CODIGO_SECTOR,
+        pipcciap.NOMBRE_SECTOR,
+        pipcciap.CODIGO_GRUPO,
+        pipcciap.CODIGO_LIDER,
+        pipcciap.NOMBRE_LIDER,
+        pipcciap.CODIGO_CONSULTOR,
+        pipcciap.NOMBRE_CONSULTOR,
+        pipcciap.CLASIFICACION,
+        pipcciap.FECHA_INICIO_CONSULTOR,
+        pipcciap.SKU,
+        pipcciap.PRODUCTO,
+        pipcciap.NUM_PRODUCTO_PEDIDO,   -- Número del producto en el pedido (1,...,N)
+        pipcciap.CANTIDAD,                      -- Cantidad del producto en la orden
+        pipcciap.TOTAL_BRUTO,                   -- Total bruto pagado en productos
+        pipcciap.TOTAL_LIQUIDO,               -- Total pagado líquido facturado (vl_liquido * Cantidad)
+        pipcciap.MODELO_COMERCIAL,   -- VD = 1; VOL = 14
+        pipcciap.VALOR_FLETE,
+        cc.CD_ATENDIMENTO AS CODIGO_RECLAMO,        -- Identificación del reclamo
+        cc.DT_ABERTURA AS FECHA_RECLAMO,            -- Fecha de inicio de reclamo
+        cc.CICLO_CAPTACION AS CICLO_RECLAMO,        -- Ciclo donde se situa el reclamo
+        cc.COD_VENTA AS SKU_RECLAMADO,              -- SKU en reclamo
+        cc.DC_PRODUCTO AS PRODUCTO_RECLAMADO,       -- Producto en reclamo (Este nombre es más claro)
+        cc.TIPO AS TIPO_RECLAMO,                    -- Clasificación del tipo de reclamo
+        cc.DC_SITUACAO AS SITUACION_RECLAMO,        -- Indica la situación del reclamo
+        cc.PRECIO_LIQ,                              -- Precio reclamado
+        cc.QT_RECLAMADA,                            -- Cantidad reclamada
+        (cc.PRECIO_LIQ*cc.QT_RECLAMADA) AS TOTAL_LIQUIDO_RECLAMADO     -- Valor reclamado y devuelto (Precio Líquido * Cantidad Reclamada)
+FROM (
+SELECT  pipcci.NUMERO_PEDIDO,
+        pipcci.FECHA_PEDIDO,
+        pipcci.FECHA_FACTURACION,
+        pipcci.CICLO_PEDIDO,
+        pipcci.CODIGO_GERENCIA,   -- Código gerencia de ventas
+        pipcci.NOMBRE_GERENCIA,       -- Nombre gerencia de ventas
+        --pipcci.CODIGO_GERENTE,    -- Código gerente de ventas
+        --pipcci.NOMBRE_GERENTE,     -- Nombre gerente de ventas
+        pipcci.CODIGO_SECTOR,
+        pipcci.NOMBRE_SECTOR,
+        pipcci.CODIGO_GRUPO,
+        pipcci.CODIGO_LIDER,
+        pipcci.NOMBRE_LIDER,
+        pipcci.CODIGO_CONSULTOR,
+        pipcci.NOMBRE_CONSULTOR,
+        pipcci.CLASIFICACION,
+        ap.start_date AS FECHA_INICIO_CONSULTOR,     -- Fecha de inicio del o la consultora
+        pipcci.SKU,
+        pipcci.PRODUCTO,
+        pipcci.NUM_PRODUCTO_PEDIDO,   -- Número del producto en el pedido (1,...,N)
+        pipcci.CANTIDAD,                      -- Cantidad del producto en la orden
+        pipcci.TOTAL_BRUTO,                 -- Total bruto pagado en productos
+        pipcci.TOTAL_LIQUIDO,               -- Total pagado líquido facturado (vl_liquido * Cantidad)
+        pipcci.MODELO_COMERCIAL,   -- VD = 1; VOL = 14
+        pipcci.VALOR_FLETE
+FROM (
+SELECT  pip.NUMERO_PEDIDO,
+        pip.FECHA_PEDIDO,
+        pip.FECHA_FACTURACION,
+        pip.CICLO_PEDIDO,
+        pip.CODIGO_GERENCIA,   -- Código gerencia de ventas
+        pip.NOMBRE_GERENCIA,       -- Nombre gerencia de ventas
+        --pip.CODIGO_GERENTE,    -- Código gerente de ventas
+        --pip.NOMBRE_GERENTE,     -- Nombre gerente de ventas
+        pip.CODIGO_SECTOR,
+        pip.NOMBRE_SECTOR,
+        (SELECT cci.group_code
+        FROM product.elo_modelo_combinado.commercial_consultant_index cci
+        WHERE pip.CICLO_PEDIDO = cci.operational_cycle AND pip.CODIGO_CONSULTOR = cci.person_code
+        ORDER BY cci.group_code
+        LIMIT 1) AS CODIGO_GRUPO,
+        (SELECT cci.leader_code
+        FROM product.elo_modelo_combinado.commercial_consultant_index cci
+        WHERE pip.CICLO_PEDIDO = cci.operational_cycle AND pip.CODIGO_CONSULTOR = cci.person_code
+        ORDER BY cci.leader_code
+        LIMIT 1) AS CODIGO_LIDER,               -- Código líder de grupo
+        (SELECT cci.leader_name
+        FROM product.elo_modelo_combinado.commercial_consultant_index cci
+        WHERE pip.CICLO_PEDIDO = cci.operational_cycle AND pip.CODIGO_CONSULTOR = cci.person_code
+        ORDER BY cci.leader_name
+        LIMIT 1) AS NOMBRE_LIDER,              -- Nombre líder de grupo
+        pip.CODIGO_CONSULTOR,
+        (SELECT cci.person_name
+        FROM product.elo_modelo_combinado.commercial_consultant_index cci
+        WHERE pip.CICLO_PEDIDO = cci.operational_cycle AND pip.CODIGO_CONSULTOR = cci.person_code
+        ORDER BY cci.person_name
+        LIMIT 1) AS NOMBRE_CONSULTOR,
+        (SELECT cci.level_name
+        FROM product.elo_modelo_combinado.commercial_consultant_index cci
+        WHERE pip.CICLO_PEDIDO = cci.operational_cycle AND pip.CODIGO_CONSULTOR = cci.person_code
+        ORDER BY cci.level_name
+        LIMIT 1) AS CLASIFICACION,              -- Camino recorrido (Bronce, Oro, etc)
+        pip.SKU,
+        pip.PRODUCTO,
+        pip.NUM_PRODUCTO_PEDIDO,   -- Número del producto en el pedido (1,...,N)
+        pip.CANTIDAD,                      -- Cantidad del producto en la orden
+        pip.TOTAL_BRUTO,                    -- Total bruto pagado
+        pip.TOTAL_LIQUIDO,               -- Total pagado líquido facturado (vl_liquido * Cantidad)
+        pip.MODELO_COMERCIAL,   -- VD = 1; VOL = 14
+        pip.VALOR_FLETE,
+        (SELECT cci.country_code
+        FROM product.elo_modelo_combinado.commercial_consultant_index cci
+        WHERE pip.CICLO_PEDIDO = cci.operational_cycle AND pip.CODIGO_CONSULTOR = cci.person_code
+        ORDER BY cci.country_code
+        LIMIT 1) AS CCI_PAIS
+FROM (
+SELECT  CONCAT(pi.NUMERO_PEDIDO, pi.NUMERO_PEDIDO_ITEM) AS ID_REG,
+        pi.NUMERO_PEDIDO AS NUMERO_PEDIDO,
+        p.DATA_CAPTACAO AS FECHA_PEDIDO,
+        p.DATA_FATURAMENTO_PEDIDO AS FECHA_FACTURACION,
+        p.CICLO_CAPTACAO AS CICLO_PEDIDO,
+        p.CODIGO_ESTRUTURA_COMERCIAL_SUPERIOR AS CODIGO_GERENCIA,   -- Código gerencia de ventas
+        p.NOME_ESTRUTURA_COMERCIAL_SUPERIOR AS NOMBRE_GERENCIA,       -- Nombre gerencia de ventas
+  --      p.CD_RESP_ESTRUT_COMERCIAL_SUP AS CODIGO_GERENTE,    -- Código gerente de ventas
+  --      p.DC_RESP_ESTRUT_COMERCIAL_SUP AS NOMBRE_GERENTE,     -- Nombre gerente de ventas
+        p.CODIGO_ESTRUTURA_COMERCIAL AS CODIGO_SECTOR,
+        p.NOME_ESTRUTURA_COMERCIAL AS NOMBRE_SECTOR,
+        p.CODIGO_REVENDEDOR AS CODIGO_CONSULTOR,
+        pi.CODIGO_PRODUTO AS SKU,
+        pi.NOME_PRODUTO AS PRODUCTO,
+        pi.NUMERO_PEDIDO_ITEM AS NUM_PRODUCTO_PEDIDO,   -- Número del producto en el pedido (1,...,N)
+        pi.QTD_ITEM AS CANTIDAD,                      -- Cantidad del producto en la orden
+        pi.VALOR_TOTAL_PRATICADO AS TOTAL_BRUTO,       -- Valor bruto pagado sin flete
+        (pi.VALOR_UNITARIO_LIQUIDO*pi.QTD_ITEM) AS TOTAL_LIQUIDO,               -- Total pagado líquido facturado (vl_liquido * Cantidad)
+        p.VALOR_FRETE AS VALOR_FLETE,   -- Valor del despacho, se incluye en cada línea de producto NO SUMAR
+        p.CODIGO_MODELO_COMERCIAL AS MODELO_COMERCIAL   -- VD = 1; VOL = 14
+FROM platform.natura2go_chile_replica.pedido_item pi       -- Tabla principal
+LEFT JOIN platform.natura2go_chile_replica.pedido p        -- Datos generales del pedido
+ON p.NUMERO_PEDIDO = pi.NUMERO_PEDIDO
+) pip
+) pipcci
+LEFT JOIN (SELECT ac.candidate_id, people.start_date
+           FROM platform.gdp_gpp_cadwf_people_replica.approved_candidate ac
+           LEFT JOIN
+                (SELECT person_id, MIN(start_date) as start_date
+                 FROM platform.gdp_gpp_cadwf_people_replica.person_roles   -- filtrar por rol, funcion y modelo de negocios (todos son 1)
+                 WHERE person_id IN (
+                     SELECT person_id
+                     FROM platform.gdp_gpp_cadwf_people_replica.person
+                     WHERE country_id = 4)
+                AND function_id = 1
+                AND roles_id = 1
+                AND business_model_id = 1
+                GROUP BY person_id) people
+            ON people.person_id = ac.person_id
+            WHERE people.start_date IS NOT NULL) ap                         -- Buscar fecha de inicio
+ON pipcci.CODIGO_CONSULTOR = ap.candidate_id
+) pipcciap
+LEFT JOIN sandbox.td_sql_chile.bbdd_customer_care cc                     -- Datos del reclamo
+ON cc.CD_PEDIDO = pipcciap.NUMERO_PEDIDO AND pipcciap.SKU = cc.COD_VENTA
+)
+)
+SELECT *
+FROM CTE
+WHERE row_num = 1"
+q2-facturaci-n-retail-chile;Facturación Retail Chile;Retail;"SELECT 
+    CONCAT(l.GL_depot,l.GL_NUMERO) AS LLAVE, -- Llave para identificar ventas únicas como si fuera número de boleta
+    l.GL_REPRESENTANT AS VENDEDOR,        -- RUT Vendedor
+    UPPER(nv.NOMBREVENDEDOR) AS NOMBREVENDEDOR,  -- Nombre del vendedor
+    l.GL_CODEARTICLE AS SKU,              -- producto
+    l.GL_LIBELLE AS DESCRIPCION,          -- Descripción del Producto
+    l.GL_PUTTC AS TOTALBRUTO,               -- Total bruto (con IVA) sin descuento 
+    l.GL_TOTALTTC AS TOTALBRUTO2,          -- Total bruto (con IVA) con descuento REMISELIGNE: TOTAL_BRUTO
+    l.GL_PUHT AS TOTALNETO,                -- Total Neto (sin IVA) sin descuento 
+    l.GL_TOTALHT AS TOTALNETO2,            -- Total Neto (sin IVA) con descuento REMISELIGNE: TOTAL LIQUIDO
+    l.GL_QTESTOCK AS CANTIDAD,            -- Cantidad vendida (o unidades)
+    l.GL_DATEPIECE AS FECHAVENTA,         -- día, mes, año
+    l.GL_TIERS AS RUT,                    -- rut cliente
+    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(l.GL_TIERS, '.', ''), '-', ''), ' ', ''), 'k', ''), 'K', '') as RUT2, --rut cliente sin puntos ni guiones
+    l.GL_ETABLISSEMENT AS ALMACEN,        -- Código de la tienda
+    UPPER(es.et_libelle) AS NOMBREALMACEN,        -- nombre de la tienda
+    CASE WHEN l.GL_ETABLISSEMENT = 9201 THEN 'AVON CFT' ELSE 'NATURA' END AS NEGOCIO,
+    l.GL_REMISELIGNE AS DESCUENTO,       -- $ Descuento aplicado a la venta
+    l.GL_REMISELIBRE3 AS TOTALDESCUENTO,     -- Total descuento aplicado 
+    l.GL_REGIMETAXE AS PAIS,              -- País CHL
+    l.GL_CODEMODELETAXE AS PAIS1,          -- País CL 
+    l.GL_PAYSTAXE AS PAIS2                -- País CHL
+FROM 
+    platform.cegid_dbo_replica.ligne_document_lines l
+LEFT JOIN (SELECT et_etablissement, et_libelle       --Obtener nombres de tiendas
+      FROM platform.cegid_dbo_replica.etabliss_stores 
+      WHERE et_localis = 'CHL') es
+ON l.GL_ETABLISSEMENT = es.et_etablissement
+LEFT JOIN (
+  SELECT T_TIERS, CONCAT(T_PRENOM, ' ', T_ABREGE) AS NOMBREVENDEDOR   --Obtener nombre del vendedor
+FROM 
+  platform.cegid_dbo_replica.tiers_third_parties
+) nv
+ON nv.T_TIERS = l.GL_REPRESENTANT
+LEFT JOIN platform.cegid_dbo_replica.piece_documents pd  
+on concat(l.GL_depot,l.GL_NUMERO)  = concat(pd.GP_depot,pd.GP_NUMERO ) 
+where l.GL_PAYSTAXE = 'CHL'
+and pd.GP_TYPECOMPTA  IN ('TIC', 'FAC') 
+and l.GL_NATUREPIECEG = 'FFO'
+AND l.GL_TYPELIGNE NOT IN ('COM', 'TOT')"
+q3-facturaci-n-vd-vol-chl-nat2go;Facturación VD VOL CHL NAT2GO;VD;"SELECT p.NUMERO_PEDIDO,
+       p.SITUACAO_FISCAL_PEDIDO AS Estado,
+       p.CODIGO_MODELO_COMERCIAL As Modelo,
+       pi.CODIGO_PRODUTO,
+       pi.NOME_PRODUTO,
+       UPPER(co.Negocio) as negocio,
+       UPPER(co.Marca) as marca,
+       UPPER(co.`Sub Marca`) AS sub_marca,
+       UPPER(co.Categoria) AS categoria,
+       UPPER(co.`Sub-Categoria`) as sub_catgegoria,
+       pi.NUMERO_PEDIDO_ITEM,
+       pi.QTD_ITEM,
+       pi.VALOR_TOTAL_PRATICADO,
+       pi.VALOR_COMISSAO,
+       pi.VALOR_IMPOSTO,
+       pi.VALOR_RETENCAO,
+       p.VALOR_FRETE,
+       p.DATA_FATURAMENTO_PEDIDO
+FROM platform.natura2go_chile_replica.pedido_item pi
+LEFT JOIN platform.natura2go_chile_replica.pedido p
+ON pi.NUMERO_PEDIDO = p.NUMERO_PEDIDO
+LEFT JOIN sandbox.td_sql_chile.categorizacion_omnicanal co 
+ON co.SKU = pi.CODIGO_PRODUTO"
+q4-facturaci-n-vd-vol-chl-nat2go;Facturación VD VOL CHL NAT2GO;VOL;"SELECT p.NUMERO_PEDIDO,
+       p.SITUACAO_FISCAL_PEDIDO AS Estado,
+       p.CODIGO_MODELO_COMERCIAL As Modelo,
+       pi.CODIGO_PRODUTO,
+       pi.NOME_PRODUTO,
+       UPPER(co.Negocio) as negocio,
+       UPPER(co.Marca) as marca,
+       UPPER(co.`Sub Marca`) AS sub_marca,
+       UPPER(co.Categoria) AS categoria,
+       UPPER(co.`Sub-Categoria`) as sub_catgegoria,
+       pi.NUMERO_PEDIDO_ITEM,
+       pi.QTD_ITEM,
+       pi.VALOR_TOTAL_PRATICADO,
+       pi.VALOR_COMISSAO,
+       pi.VALOR_IMPOSTO,
+       pi.VALOR_RETENCAO,
+       p.VALOR_FRETE,
+       p.DATA_FATURAMENTO_PEDIDO
+FROM platform.natura2go_chile_replica.pedido_item pi
+LEFT JOIN platform.natura2go_chile_replica.pedido p
+ON pi.NUMERO_PEDIDO = p.NUMERO_PEDIDO
+LEFT JOIN sandbox.td_sql_chile.categorizacion_omnicanal co 
+ON co.SKU = pi.CODIGO_PRODUTO"
+q5-lideres-activas-y-su-email;Lideres Activas y su email;VD;"WITH MinEmail AS (
+    SELECT 
+        e.person_id,
+        lower(e.email_address) AS correo_electronico,
+        e.type_email AS tipo_correo,
+        ROW_NUMBER() OVER (PARTITION BY e.person_id ORDER BY e.type_email ASC) AS rn
+    FROM platform.gdp_gpp_cadwf_people_replica.email AS e
+    WHERE e.type_email IS NOT NULL 
+      AND e.email_address IS NOT NULL
+      and e.email_address  <>  'josemiguel_sagredo@hotmail.com'-- filtro por person id duplicado con otro pais que trae usuario incorrecto
+)
+SELECT 
+    p.person_id,
+   upper(p.full_name)  AS nombre_completo,
+    p.birthday AS fecha_nacimiento,
+    TIMESTAMPDIFF(YEAR, p.birthday, CURDATE()) AS edad,
+    CASE
+        WHEN p.gender_id = 1 THEN 'Hombre'
+        WHEN p.gender_id = 2 THEN 'Mujer'
+        ELSE 'Otro'
+    END AS genero,
+    em.correo_electronico,
+    pr.start_date AS fecha_inicio,
+    pr.sales_hierarchy_id AS grupo,
+    ap.person_code AS person_code,
+    cci.Sector_Code AS SectorCode,
+    cci.Sector_Name AS SectorName,
+    cci.Operational_Cycle AS OperationalCycle,
+    cci.Person_Code AS PersonCode,
+    cci.Level_Name AS LevelName,
+    CASE 
+        WHEN cci.Flag IS NULL THEN 'Nuevas'
+        ELSE cci.Flag
+    END AS Origen_CB
+FROM platform.gdp_gpp_cadwf_people_replica.person AS p
+LEFT JOIN platform.gdp_gpp_cadwf_people_replica.person_roles AS pr
+    ON p.person_id = pr.person_id
+left join platform.gdp_gpp_brm_brm_replica.brm_person ap
+on p.person_id=ap.person_uid
+LEFT JOIN product.elo_modelo_combinado.commercial_consultant_index AS cci
+    ON cci.person_code = ap.person_code
+LEFT JOIN MinEmail AS em
+    ON p.person_id = em.person_id AND em.rn = 1
+WHERE 
+    p.country_id = 4
+    AND pr.business_model_id = 1 -- Venta directa
+    AND pr.function_id = 4 -- Líder
+    AND pr.roles_id = 6 -- Líder
+    AND pr.end_date IS NULL -- Sin fecha de cese en el rol seleccionado (activa)
+    AND pr.status = 3 -- Aprobado
+   AND pr.substatus = 6 -- Aprobado
+   AND pr.sales_hierarchy_id IS NOT NULL --CODIGO DE GRUPO
+   AND cci.Country_Code = 152
+    and cci.Sector_Code IS NOT NULL
+    and cci.operational_cycle>=202407
+    GROUP BY ALL"
+q6-gn-activas-y-su-email;GN activas y su email;VD;"WITH MinEmail AS (
+    SELECT 
+        e.person_id,
+        lower(e.email_address) AS correo_electronico,
+        e.type_email AS tipo_correo,
+        ROW_NUMBER() OVER (PARTITION BY e.person_id ORDER BY e.type_email ASC) AS rn
+    FROM platform.gdp_gpp_cadwf_people_replica.email AS e
+    WHERE e.type_email IS NOT NULL 
+      AND e.email_address IS NOT NULL
+      and e.email_address  <>  'josemiguel_sagredo@hotmail.com'-- filtro por person id duplicado con otro pais que trae usuario incorrecto
+)
+SELECT 
+    p.person_id,
+   upper(p.full_name)  AS nombre_completo,
+    p.birthday AS fecha_nacimiento,
+    TIMESTAMPDIFF(YEAR, p.birthday, CURDATE()) AS edad,
+    CASE
+        WHEN p.gender_id = 1 THEN 'Hombre'
+        WHEN p.gender_id = 2 THEN 'Mujer'
+        ELSE 'Otro'
+    END AS genero,
+    em.correo_electronico,
+    pr.start_date AS fecha_inicio,
+    pr.sales_hierarchy_id AS grupo,
+    ap.person_code AS person_code,
+    cci.Sector_Code AS SectorCode,
+    cci.Sector_Name AS SectorName,
+    cci.Operational_Cycle AS OperationalCycle,
+    cci.Person_Code AS PersonCode,
+    cci.Level_Name AS LevelName,
+    CASE 
+        WHEN cci.Flag IS NULL THEN 'Nuevas'
+        ELSE cci.Flag
+    END AS Origen_CB
+FROM platform.gdp_gpp_cadwf_people_replica.person AS p
+LEFT JOIN platform.gdp_gpp_cadwf_people_replica.person_roles AS pr
+    ON p.person_id = pr.person_id
+left join platform.gdp_gpp_brm_brm_replica.brm_person ap
+on p.person_id=ap.person_uid
+LEFT JOIN product.elo_modelo_combinado.commercial_consultant_index AS cci
+    ON cci.person_code = ap.person_code
+LEFT JOIN MinEmail AS em
+    ON p.person_id = em.person_id AND em.rn = 1
+WHERE 
+    p.country_id = 4
+    AND pr.business_model_id = 1 -- Venta directa
+    AND pr.function_id = 16-- gn
+    AND pr.roles_id = 6 -- gn
+    AND pr.end_date IS NULL -- Sin fecha de cese en el rol seleccionado (activa)
+    AND pr.status = 3 -- Aprobado
+   AND pr.substatus = 6 -- Aprobado
+   AND pr.sales_hierarchy_id IS NOT NULL --CODIGO DE GRUPO
+   AND cci.Country_Code = 152
+    and cci.Sector_Code IS NOT NULL
+    and cci.operational_cycle>=202407
+    GROUP BY ALL"
+q7-queries-maia-s1;Queries MAIA s1;VD;"SELECT
+level_name,
+COUNT(DISTINCT person_code) AS count_nivel,
+ROUND(COUNT(DISTINCT person_code) * 100.0 / SUM(COUNT(DISTINCT person_code)) OVER(), 2) AS Porcentaje_por_nivel
+FROM product.elo_modelo_combinado.commercial_consultant_index
+    WHERE leader_code = '10225842'
+     AND country_code = 152
+     AND operational_cycle = 202503
+GROUP BY level_name
+----------------------------------------------------------------
+---Consulta de Niveles y Camino de Crecimiento de Consultoras--
+---------------------------------------------------------------
+SELECT
+    TRIM(UPPER(level_name)) AS nivel,
+    COUNT(DISTINCT person_code) AS personas,
+    ROUND(
+        COUNT(DISTINCT person_code) * 100.0 / SUM(COUNT(DISTINCT person_code)) OVER(), 
+        2
+    ) AS Porcentaje_por_nivel
+FROM product.elo_modelo_combinado.commercial_consultant_index
+WHERE country_code = 152
+  AND level_name IS NOT NULL
+  AND leader_code = 10225842
+  AND operational_cycle = 202503
+GROUP BY TRIM(UPPER(level_name));
+
+select level_name,Level_code, operational_cycle, person_code FROM product.elo_modelo_combinado.commercial_consultant_index where country_code=152  and leader_code=10402229 GROUP BY ALL
+
+
+----------------------------------------------------------------
+---Consulta de Consultoras según Nivel Seleccionado---
+---------------------------------------------------------------
+SELECT person_name as Nombre_CB, 
+person_code as CB, 
+TRIM(UPPER(level_name)) AS nivel,
+next_level_name as Proximo_Nivel,
+level_growth_value
+FROM product.elo_modelo_combinado.commercial_consultant_index 
+WHERE 1=1 
+AND country_code = 152
+AND leader_code = 10402229
+AND level_code = 2
+AND operational_cycle = 202503
+
+----------------------------------------------------------------
+---Consulta Detallada de Consultoras por Nivel---
+---------------------------------------------------------------
+SELECT person_name, 
+level_name AS Nivel_actual, 
+next_level_name AS Proximo_nivel, 
+next_revenue_value - accumulated_value AS missing_points FROM product.elo_modelo_combinado.commercial_consultant_index
+WHERE 
+1=1
+AND person_code = 11203474
+AND operational_cycle = (SELECT MAX(operational_cycle) FROM product.elo_modelo_combinado.commercial_consultant_index WHERE person_code = 11203474 )
+AND country_code = 152;
+---
+SELECT person_name, 
+level_name AS current_level, 
+next_level_name AS next_level, 
+next_revenue_value - accumulated_value AS missing_points FROM product.elo_modelo_combinado.commercial_consultant_index
+WHERE person_code = '10402229' 
+AND country_code = 152 
+AND operational_cycle = (SELECT MAX(operational_cycle) FROM product.elo_modelo_combinado.commercial_consultant_index WHERE person_code = '10402229'  
+AND country_code = 152);
+----------------------------------------------------------------
+---Análisis de Consultoras Cercanas al Siguiente Nivel de Crecimiento---
+---------------------------------------------------------------
+SELECT person_name, 
+person_code,
+level_name AS current_level, 
+next_level_name AS next_level, 
+(next_revenue_value - accumulated_value) AS points_to_next_level 
+FROM product.elo_modelo_combinado.commercial_consultant_index 
+WHERE 1=1
+AND country_code = 152
+AND leader_code = 10402229
+AND operational_cycle = 202503
+ORDER BY points_to_next_level 
+ASC
+----------------------------------------------------------------
+---Ficha de Líder y Visión General del Grupo---
+---------------------------------------------------------------
+SELECT structure_code,
+    SUM(CASE WHEN index_code = 413 THEN index_value ELSE 0 END) AS Espacio_Digital_Abierto,
+    SUM(CASE WHEN index_code = 414 THEN index_value ELSE 0 END) AS Espacio_Digital_con_Ventas,
+    SUM(CASE WHEN index_code = 383 THEN index_value ELSE 0 END) AS Saldo_Disponibles,
+    SUM(CASE WHEN index_code = 373 THEN index_value ELSE 0 END) AS Facturacion_Total,
+    SUM(CASE WHEN index_code = 32 THEN index_value ELSE 0 END) AS Cadastro,
+    SUM(CASE WHEN index_code = 92 THEN index_value ELSE 0 END) AS Indisponibles,
+    SUM(CASE WHEN index_code = 384 THEN index_value ELSE 0 END) AS indis_Cadastro,
+    SUM(CASE WHEN index_code = 379 THEN index_value ELSE 0 END) AS Inicios,
+    SUM(CASE WHEN index_code = 63 THEN index_value ELSE 0 END) AS Inicios_e_Reinicios,
+    SUM(CASE WHEN index_code = 380 THEN index_value ELSE 0 END) AS Reinicios,
+    SUM(CASE WHEN index_code = 68 THEN index_value ELSE 0 END) AS Recuperos,
+    SUM(CASE WHEN index_code = 74 THEN index_value ELSE 0 END) AS Cesadas,
+    SUM(CASE WHEN index_code = 370 THEN index_value ELSE 0 END) AS Puntos_Total,
+    SUM(CASE WHEN index_code = 38 THEN index_value ELSE 0 END) AS Inactivas_1,
+    SUM(CASE WHEN index_code = 39 THEN index_value ELSE 0 END) AS Inactivas_2,
+    SUM(CASE WHEN index_code = 40 THEN index_value ELSE 0 END) AS Inactivas_3,
+    SUM(CASE WHEN index_code = 41 THEN index_value ELSE 0 END) AS Inactivas_4,
+    SUM(CASE WHEN index_code = 42 THEN index_value ELSE 0 END) AS Inactivas_5,
+    SUM(CASE WHEN index_code = 43 THEN index_value ELSE 0 END) AS Inactivas_6
+FROM platform.gdp_gcp_scylla_growth_plan_replica.structure_index
+WHERE
+1=1
+AND operational_cycle = 202503 --parametro ( este valor cambia)
+AND structure_code = 2865 --parametro ( este valor cambia)
+AND structure_level = 3
+AND business_model = 1
+AND country = 152
+GROUP BY structure_code
+
+----------------------------------------------------------------
+---Consulta de Registro y Total de Consultoras del Grupo---
+---------------------------------------------------------------
+SELECT 
+    CASE 
+        WHEN UPPER(FLAG) IS NULL THEN 'NUEVAS' 
+        ELSE UPPER(FLAG) 
+    END AS FLAG, 
+    COUNT(DISTINCT person_code) AS count, 
+    SUM(revenue_nat_ss_amt) AS total_revenue_in_soles, 
+    AVG(points_nat_ss_amt) AS avg_points, 
+    COUNT(CASE WHEN registered_bc_ind = 1 THEN 1 END) AS active_consultants, 
+    operational_cycle 
+FROM product.elo_modelo_combinado.commercial_consultant_index 
+WHERE 1=1
+  AND country_code = 152
+  AND leader_code = :leader_code
+  AND operational_cycle = :operational_cycle
+GROUP BY 
+    CASE 
+        WHEN UPPER(FLAG) IS NULL THEN 'NUEVAS' 
+        ELSE UPPER(FLAG) 
+    END, 
+    operational_cycle;
+
+----------------------------------------------------------------
+---Análisis de la Evolución de Consultoras en el Grupo---
+---------------------------------------------------------------
+SELECT operational_cycle, COUNT( DISTINCT person_code ) AS total_consultoras
+FROM product.elo_modelo_combinado.commercial_consultant_index
+WHERE 
+1=1
+AND country_code = 152 
+AND business_status_code = 3
+AND leader_code = :leader_code 
+GROUP BY operational_cycle
+ORDER BY operational_cycle DESC
+LIMIT 6
+
+-----------
+-------
+select distinct(structure_code) from  platform.gdp_gcp_scylla_growth_plan_replica.structure_index where country=152 and structure_level=3
+
+select * from product.elo_modelo_combinado.commercial_consultant_index where country_code=152 and person_code = 7853"
+q8-base-completa-de-cnd-salesforce;Base completa de CND (SALESFORCE);VOL;"WITH MaxOperationalCycle AS (
+    SELECT 
+        person_code,
+        MAX(operational_cycle) AS max_operational_cycle
+    FROM 
+        product.elo_modelo_combinado.commercial_consultant_index
+    WHERE 
+        country_code = 152
+        AND active_bc_ind = 1
+    GROUP BY 
+        person_code
+),
+JoinedData AS (
+    SELECT 
+        cci.accumulated_value,
+        cci.active_bc_ind,
+        cci.group_code,
+        cci.sales_management_code,
+        cci.sales_management_name,
+        cci.sector_code,
+        cci.sector_name,
+        cci.level_code,
+        cci.level_name,
+        moc.max_operational_cycle AS operational_cycle,
+        moc.person_code,
+        doc.number AS document_number
+    FROM 
+        MaxOperationalCycle moc
+    LEFT JOIN 
+        product.elo_modelo_combinado.commercial_consultant_index cci
+        ON moc.person_code = cci.person_code
+        AND moc.max_operational_cycle = cci.operational_cycle
+        AND cci.country_code = 152
+    LEFT JOIN 
+        platform.gdp_gpp_cadwf_people_replica.approved_candidate ac 
+        ON cci.person_code = ac.candidate_id
+    LEFT JOIN 
+        platform.gdp_gpp_cadwf_people_replica.person p 
+        ON p.person_id = ac.person_id 
+    LEFT JOIN 
+        platform.gdp_gpp_cadwf_people_replica.document doc 
+        ON p.person_id = doc.person_id
+        AND p.country_id = 4
+    WHERE 
+        cci.active_bc_ind = 1
+        AND doc.number IS NOT NULL
+)
+SELECT 
+    c.person_number as Codigo_VOL,
+    jd.person_code as Codigo_VD,
+    CONCAT(LOWER(c.first_name), ' ', LOWER(c.last_name)) AS Nombre_CB,
+    c.birthday as Fecha_nacimiento,
+    c.gender as Gender,
+    LOWER(c.document) AS Rut, -- Aplicar LOWER() a document
+    LOWER(c.email) AS Email,       -- Aplicar LOWER() a email
+    c.state_code as Region,
+    c.city as Ciudad,
+    c.neighborhood as Comuna,
+    CONCAT(LOWER(c.address), ' ', LOWER(c.number)) AS direccion,
+    c.home_phone as Telefono_Fijo,
+    c.mobile_phone as Telefono_Movil,
+    c.store_id as Tienda,
+    c.store_activation_date as Fecha_activacion_tienda,
+    c.store_status as Estado_tienda,
+    jd.accumulated_value as Puntaje_acumulado,
+    jd.active_bc_ind as Activa,
+    jd.group_code as Codigo_Grupo,
+    jd.sales_management_code as Codigo_Gerencia,
+    jd.sales_management_name as Gerencia,
+    jd.sector_code as Codigo_sector,
+    jd.sector_name as Sector,
+    jd.level_name as Nivel
+FROM 
+    platform.commerce_cloud_natura_chile_replica.consultants c
+LEFT JOIN 
+    JoinedData jd
+    ON LOWER(c.document) = LOWER(jd.document_number);"
+q9-activacion-tienda;Activacion Tienda;VOL;"select
+person_number as Codigo_Vol,
+CONCAT(LOWER(first_name), ' ', LOWER(last_name)) AS Nombre_CB,
+store_id as Tienda,
+store_activation_date as Activacion_tienda
+from platform.commerce_cloud_natura_chile_replica.consultants
+group by all"
+q10-pedidos-vol-salesforce;Pedidos  VOL Salesforce;VOL;"WITH MaxOperationalCycle AS (
+    SELECT 
+        person_code,
+        MAX(operational_cycle) AS max_operational_cycle
+    FROM 
+        product.elo_modelo_combinado.commercial_consultant_index
+    WHERE 
+        country_code = 152
+        AND active_bc_ind = 1
+    GROUP BY 
+        person_code
+),
+JoinedData AS (
+    SELECT 
+        cci.accumulated_value,
+        cci.active_bc_ind,
+        cci.group_code,
+        cci.sales_management_code,
+        cci.sales_management_name,
+        cci.sector_code,
+        cci.sector_name,
+        cci.level_code,
+        cci.level_name,
+        moc.max_operational_cycle AS operational_cycle,
+        moc.person_code,
+        doc.number AS document_number
+    FROM 
+        MaxOperationalCycle moc
+    LEFT JOIN 
+        product.elo_modelo_combinado.commercial_consultant_index cci
+        ON moc.person_code = cci.person_code
+        AND moc.max_operational_cycle = cci.operational_cycle
+        AND cci.country_code = 152
+    LEFT JOIN 
+        platform.gdp_gpp_cadwf_people_replica.approved_candidate ac 
+        ON cci.person_code = ac.candidate_id
+    LEFT JOIN 
+        platform.gdp_gpp_cadwf_people_replica.person p 
+        ON p.person_id = ac.person_id 
+    LEFT JOIN 
+        platform.gdp_gpp_cadwf_people_replica.document doc 
+        ON p.person_id = doc.person_id
+        AND p.country_id = 4
+    WHERE 
+        cci.active_bc_ind = 1
+        AND doc.number IS NOT NULL
+)
+SELECT 
+    c.person_number AS Codigo_VOL,
+    jd.person_code AS Codigo_VD,
+    CONCAT(LOWER(c.first_name), ' ', LOWER(c.last_name)) AS Nombre_CB,
+    c.store_id AS Tienda,
+    c.store_status AS Estado_Tienda,
+    jd.accumulated_value AS Puntaje_Acumulado,
+    jd.active_bc_ind AS Activa,
+    jd.group_code AS Codigo_Grupo,
+    jd.sales_management_code AS Codigo_Gerencia,
+    jd.sales_management_name AS Gerencia,
+    jd.sector_code AS Codigo_Sector,
+    jd.sector_name AS Sector,
+    jd.level_name AS Nivel,
+    o.order_no AS NumeroPedido,
+    o.order_date AS Fecha_pedido,
+    o.customer_no AS Cliente,
+    o.order_status AS EstadoPedido,
+    o.shipping_status AS EstadoEnvio,
+    o.payment_status AS EstadoPago,
+    o.adjusted_merchandize_total AS TotalMercaderiaAjustado,
+    o.shipping_total AS TotalEnvio,
+    o.order_total AS TotalPedido,
+    o.consultant_commission_percentage AS PorcentajeComisionConsultora,
+    o.company_commission_percentage AS PorcentajeComisionEmpresa,
+    o.consultant_commission_amount AS MontoComisionConsultora,
+    o.company_commission_amount AS MontoComisionEmpresa
+FROM 
+    platform.commerce_cloud_natura_chile_replica.consultants c
+LEFT JOIN 
+    JoinedData jd
+    ON LOWER(c.document) = LOWER(jd.document_number)
+LEFT JOIN 
+    platform.commerce_cloud_natura_chile_replica.orders o
+    ON c.person_number = o.consultant_person_number;"
+q11-vol-con-indicadores-vd;VOL con indicadores VD;VOL;"select 
+coi.order_cycle,
+coi.person_code as CodigoVD,
+coi.level_name as Nivel,
+coi.sector_code,
+coi.sector_name,
+coi.sales_management_code,
+coi.sales_management_name,
+coi.group_code,
+coi.order_number as PedidosVD,
+coi.product_code as Sku,
+coi.order_date as FechaPedidoVD,
+coi.product_description as Producto,
+coi.channel_description as Canal,
+coi.unit_price as PrecioUnitario,
+coi.total_price as PrecioTotal,
+ch.person_number as CodigoVOL,
+ch.store_id as Tienda,
+ch.store_activation_date as ActivacionTiendaOnline
+from  product.elo_modelo_combinado.commercial_orders_index coi 
+ LEFT JOIN 
+        platform.gdp_gpp_cadwf_people_replica.approved_candidate ac 
+        ON coi.person_code = ac.candidate_id
+    LEFT JOIN 
+        platform.gdp_gpp_cadwf_people_replica.person p 
+        ON p.person_id = ac.person_id 
+    LEFT JOIN 
+        platform.gdp_gpp_cadwf_people_replica.document doc 
+        ON p.person_id = doc.person_id
+        AND p.country_id = 4
+    left join  platform.commerce_cloud_natura_chile_replica.consultants ch
+     ON LOWER(ch.document) = LOWER(doc.number)
+     where coi.country_code=152
+     ;"
+q12-tiendas-activas-vol;Tiendas activas VOL;VOL;"SELECT 
+  C.person_number as CODIGO_VOL, -- ID tienda VOL
+  CONCAT(C.first_name, ' ', C.last_name) AS NOMBRE, -- Nombre tienda VOL
+  C.store_id AS CD_ESTADO_TIENDA,  -- Estado de tienda
+  C.store_status AS DC_ESTADO_TIENDA, -- Nombre estado de tienda
+  MONTH(to_date((concat(substr(o.order_date,7,4),""-"", substr(o.order_date,0,2),""-"",substr(o.order_date,4,2))), 'yyyy-MM-dd'))  AS    MES_PEDIDO,  -- Mes del pedido
+  YEAR(to_date((concat(substr(o.order_date,7,4),""-"", substr(o.order_date,0,2),""-"",substr(o.order_date,4,2))), 'yyyy-MM-dd'))  AS YEAR_PEDIDO,  -- Mes del pedido
+  CASE 
+    WHEN C.store_status = 1 AND O.adjusted_merchandize_total > 0 THEN 'Activa con Venta'
+    WHEN C.store_status = 1 THEN 'Activa sin Venta'
+    WHEN C.store_status = 0 THEN 'Inactivo'
+    WHEN C.store_status = 2 THEN 'Cerrada'
+    WHEN C.store_status = 3 THEN 'En Proceso'
+    WHEN C.store_status = 4 THEN 'Cancelada'
+    WHEN C.store_status = 5 THEN 'Activa no aceptada'
+    ELSE 'Desconocido'
+  END AS ESTADO
+FROM platform.commerce_cloud_natura_chile_replica.consultants C
+LEFT JOIN platform.commerce_cloud_natura_chile_replica.orders O
+  ON C.person_number = O.consultant_person_number"
+q13-identificaci-n-de-creador-de-pedidos-en-vd-y-vol;Identificación de creador de pedidos en VD y VOL;VD;"SELECT 
+  NM_PEDIDO,  -- Número de pedido
+  DT_CAPTACAO,  -- Fecha de captación
+  MONTH(DT_CAPTACAO) AS MES_CAPTACION,  -- Mes captación
+  YEAR(DT_CAPTACAO) AS YEAR_CAPTACION,  -- AÑO de captación
+  DT_FATURAMENTO,  -- Fecha de facturación
+  CD_REVENDEDOR,  -- ID de consultor/a
+  CD_USUARIO_CRIACAO_PEDIDO,  -- ID de usuario que creó el pedido
+  DC_USUARIO_CRIACAO_PEDIDO,  -- Nombre de usuario que creó el pedido
+  CD_USUARIO_FINALIZACAO_PEDIDO, -- ID de usuario que finalizó el pedido
+  DC_USUARIO_FINALIZACAO_PEDIDO -- Nombre de usuario que creó el pedido
+FROM 
+  platform.dw_o01dw_sisdmi_replica.t_prj_2go_f_pedido
+WHERE 
+  CD_PAIS = 2  -- Chile"
+q14-identificaci-n-de-creador-de-pedidos-en-vd-y-vol;Identificación de creador de pedidos en VD y VOL;VOL;"SELECT 
+  NM_PEDIDO,  -- Número de pedido
+  DT_CAPTACAO,  -- Fecha de captación
+  MONTH(DT_CAPTACAO) AS MES_CAPTACION,  -- Mes captación
+  YEAR(DT_CAPTACAO) AS YEAR_CAPTACION,  -- AÑO de captación
+  DT_FATURAMENTO,  -- Fecha de facturación
+  CD_REVENDEDOR,  -- ID de consultor/a
+  CD_USUARIO_CRIACAO_PEDIDO,  -- ID de usuario que creó el pedido
+  DC_USUARIO_CRIACAO_PEDIDO,  -- Nombre de usuario que creó el pedido
+  CD_USUARIO_FINALIZACAO_PEDIDO, -- ID de usuario que finalizó el pedido
+  DC_USUARIO_FINALIZACAO_PEDIDO -- Nombre de usuario que creó el pedido
+FROM 
+  platform.dw_o01dw_sisdmi_replica.t_prj_2go_f_pedido
+WHERE 
+  CD_PAIS = 2  -- Chile"
+q15-query-de-facturaci-n-por-detalle-de-pedido-query-o;Query de facturación por detalle de pedido (QUERY OFICIAL);VD;"SELECT 
+      o.order_number, -- Número del pedido GSP. Se debe agregar 00 al final para comparar con GERA en NUMERO_PEDIDO_EXTERNO
+      o.person_id, -- Identificador único de la persona
+      o.business_model_id, -- 1 = Venta Directa, 2 = Administrativo, 3 = Colaborador.
+      o.order_type_id, -- Tipo de orden 1: Pedido, 3: Pedido SAC 
+      o.status_id, --1 = APPROVED - AUTOMATICAMENTE,3 = APPROVED SGI,5 = PICKING6 = SHIPPED,7 = DELIVERED,8 = PENDING,10 = CANCELED,11 = CANCELED SGI,12 = REINVOICED,15 = INTEGRATION_FAILED
+      o.channel_id, --1 = Web, 2 = APP ,3 = ATENDIMENTO / CUSTOMER CARE, 4 = ADMIN REGULAR, 5 = ADMIN CURTO VENCIMENTO, 6 = WEB - FUERZA DE VENTAS / SALES FORCE, 7 = APP - FUERZA DE VENTAS/ SALES FORCE, 8 = ATENDIMENTO - DONACIÓN, 9 = SELL-IN (Caderninho), 10 = NAT.
+      oi.product_code, -- SKU o código de venda
+      oi.order_item_uid, -- Identificador único del item
+      oi.description, -- Descripción del producto
+      oi.item_type_id, --1,= Venda, 2 = Brinde, 3 = Incorporação de Venda, 4 = Incorporação de Brinde
+      oi.bundle, -- corresponde a kit = True
+      oi.promotion_id, -- id de la promoción
+      oi.quantity, -- Cantidad de productos asociados al product_code
+      CASE WHEN oi.item_type_id = 1 THEN oi.total_price ELSE 0 END AS total_price, -- Total valor del pedido
+      CASE WHEN oi.item_type_id = 1 THEN oi.total_price_wo_discounts ELSE 0 END AS total_price_wo_discounts, -- Receta Bruta
+      total_price_with_taxes, -- Receta Líquida
+      o.order_date, -- Fecha del pedido
+      o.order_cycle, -- Ciclo del pedido
+      o.current_cycle, -- Ciclo actual asociado al pedido
+      d.delivery_date, -- Fecha de despacho
+      d.shipping_amount_wo_discounts -- Valor de despacho a pagar
+FROM platform.gdp_gsp_orders_order_replica.order_item oi 
+LEFT JOIN platform.gdp_gsp_orders_order_replica.order o 
+ON oi.order_uid = o.order_uid
+LEFT JOIN platform.gdp_gsp_orders_order_replica.delivery_mode d
+ON o.order_uid = d.order_uid
+WHERE o.business_model_id IN (1, 2, 3) AND o.order_type_id = 1 AND o.country_code = 'CL' AND status_id IN (1, 3, 5, 6, 7, 8)"
+q16-query-de-facturaci-n-por-detalle-de-pedido-query-o;Query de facturación por detalle de pedido (QUERY OFICIAL);VOL;"SELECT
+    CAST(o.order_no AS BIGINT) AS order_no,
+    to_date(from_unixtime(unix_timestamp(o.order_date, 'MM/dd/yyyy HH:mm:ss'))) AS fecha_pedido,
+    o.customer_no,
+    o.consultant_person_number,
+    oi.product_id,
+    CAST(SUBSTRING_INDEX(oi.product_id, '-', -1) AS BIGINT) AS sku,
+    CAST(SUBSTRING_INDEX(oi.bundled_product_id, '-', -1) AS BIGINT) AS sku_kit,
+    oi.product_name,
+    oi.bundled_product_name,
+    oi.gift,
+    CAST(oi.quantity AS INT) AS quantity,
+    CAST(oi.item_total AS DECIMAL(36, 2)) AS item_total,
+    CAST(oi.consultant_commission_amount AS DECIMAL(36, 2)) AS consultant_commission_amount,
+    CAST(oi.company_commission_amount AS DECIMAL(36, 2)) AS company_commission_amount,
+    CAST((oi.consultant_commission_amount + oi.company_commission_amount) AS DECIMAL(36, 2)) AS total_comision,
+    CASE WHEN o.consultant_person_number IN ('', NULL) THEN CAST(oi.item_total AS DECIMAL(32, 2)) ELSE CAST((oi.consultant_commission_amount + oi.company_commission_amount) AS DECIMAL(32, 2)) END AS total_bruto,
+    oi.export_timestamp AS delivery_date,
+    o.adjusted_shipping_total AS valor_flete
+  FROM platform.commerce_cloud_natura_chile_replica.order_items oi
+  LEFT JOIN platform.commerce_cloud_natura_chile_replica.orders o
+    ON o.order_no = oi.order_no
+  WHERE
+    o.payment_status = 'PAID'
+    AND o.order_no NOT IN (
+      SELECT DISTINCT
+        CAST(NUMERO_PEDIDO_EXTERNO AS BIGINT) AS NUMERO_PEDIDO_EXTERNO
+      FROM platform.natura2go_chile_replica.pedido
+      WHERE SITUACAO_FISCAL_PEDIDO = 'Factura Anulada'
+      AND CODIGO_MODELO_COMERCIAL = 14
+      AND NUMERO_PEDIDO_EXTERNO IS NOT NULL
+    )"
+q17-reporte-cb-desde-elo;REPORTE CB DESDE ELO;nan;"SELECT
+sales_management_name AS Gerencia,
+sector_code AS Codigo_Sector,
+sector_name AS Nombre_Sector,
+operational_cycle AS Ciclo,
+case when level_name is null then ""SIN NIVEL"" ELSE level_name end as Nivel,
+sum(revenue_sd_ss_amt) AS Receta_Bruta_VD,
+sum(revenue_nat_sd_amt) AS revenue_nat_sd_amt,
+sum(revenue_avon_ss_amt) AS revenue_avon_ss_amt,
+sum(revenue_fh_ss_amt) AS revenue_fh_ss_amt,
+--sum(revenue_nat_sd_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_nat_sd_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) AS Receta_Bruta_Natura,
+(sum(revenue_avon_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_avon_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt)))) +
+(sum(revenue_fh_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_fh_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt)))) AS Receta_Bruta_Avon_Total,
+--sum(revenue_avon_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_avon_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) AS Receta_Bruta_Avon_CFT,
+sum(revenue_fh_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_fh_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) AS Receta_Bruta_CyE,
+--(sum(revenue_nat_sd_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_nat_sd_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt)))) / sum(revenue_sd_ss_amt) * 100 AS Receta_Bruta_Natura_porcent,
+((sum(revenue_avon_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_avon_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt)))) +
+(sum(revenue_fh_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_fh_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))))) / sum(revenue_sd_ss_amt) * 100 AS Receta_Bruta_Avon_Total_porcent,
+--(sum(revenue_avon_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_avon_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt)))) / sum(revenue_sd_ss_amt) * 100 AS Receta_Bruta_Avon_CFT_porcent,
+--(sum(revenue_fh_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_fh_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt)))) / sum(revenue_sd_ss_amt) * 100 AS Receta_Bruta_CyE_porcent,
+SUM(active_ds_ind + active_ds_ols_ind + active_ols_ind ) AS Activas_total,
+COUNT(DISTINCT CASE WHEN revenue_avon_fh_ss_amt > 0 THEN person_code END) AS Activas_Avon,
+COUNT(DISTINCT CASE WHEN revenue_nat_sd_amt > 0 THEN person_code END) AS Activas_Natura,
+COUNT(DISTINCT CASE WHEN revenue_avon_fh_ss_amt > 0 AND revenue_nat_sd_amt > 0 THEN person_code END) AS Activas_Mutuas,
+COUNT(CASE WHEN revenue_fh_ss_amt > 0 THEN person_code ELSE NULL END) AS activas_CyE,
+COUNT(DISTINCT CASE WHEN revenue_avon_fh_ss_amt > 0 THEN person_code END) / SUM(active_ds_ind + active_ds_ols_ind + active_ols_ind) * 100 AS `Activas_Avon_%`,
+COUNT(DISTINCT CASE WHEN revenue_nat_sd_amt > 0 THEN person_code END) / SUM(active_ds_ind + active_ds_ols_ind + active_ols_ind) * 100 AS `Activas_Natura_%`,
+COUNT(DISTINCT CASE WHEN revenue_avon_fh_ss_amt > 0 AND revenue_nat_sd_amt > 0 THEN person_code END) / SUM(active_ds_ind + active_ds_ols_ind + active_ols_ind) * 100 AS `Activas_Mutuas_%`,
+--sum(revenue_sd_ss_amt) / SUM(active_ds_ind + active_ds_ols_ind + active_ols_ind) AS Productividad_VD,
+--(sum(revenue_nat_sd_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_nat_sd_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt)))) / SUM(active_ds_ind + active_ds_ols_ind + active_ols_ind ) AS Productividad_Natura,
+((sum(revenue_avon_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_avon_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt)))) +
+(sum(revenue_fh_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_fh_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))))) / SUM(active_ds_ind + active_ds_ols_ind + active_ols_ind ) AS Productividad_Avon_Total,
+(sum(revenue_fh_ss_amt) + (sum(revenue_sd_ss_amt) - (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt))) * (sum(revenue_fh_ss_amt) / (sum(revenue_nat_sd_amt) + sum(revenue_avon_ss_amt) + sum(revenue_fh_ss_amt)))) / SUM(active_ds_ind + active_ds_ols_ind + active_ols_ind ) AS Productividad_CyE,
+SUM(active_ds_ind + active_ols_ind + active_ds_ols_ind + inactive_bc_1c_ind + inactive_bc_2c_ind + inactive_bc_3c_ind) AS Disponibles,
+SUM(active_ds_ind + active_ols_ind + active_ds_ols_ind + inactive_bc_1c_ind + inactive_bc_2c_ind + inactive_bc_3c_ind+inactive_bc_4c_ind+inactive_bc_5c_ind+inactive_bc_6c_ind) AS Cadastro,
+SUM(CASE WHEN revenue_avon_fh_ss_amt > 0 AND (begin_ind = 1 OR restart_ind = 1) THEN 1 ELSE 0 END) AS Inicios_Avon,
+SUM(CASE WHEN revenue_nat_sd_amt> 0 AND (begin_ind = 1 OR restart_ind = 1) THEN 1 ELSE 0 END) AS Inicios_Natura,
+SUM(CASE WHEN revenue_avon_fh_ss_amt > 0 AND revenue_nat_sd_amt > 0 AND (begin_ind = 1 OR restart_ind = 1) THEN 1 ELSE 0 END) AS Inicios_Mutuos,
+--SUM(CASE WHEN revenue_avon_fh_ss_amt > 0 AND (begin_ind = 1 OR restart_ind = 1) THEN 1 ELSE 0 END) / SUM(CASE WHEN begin_ind = 1 OR restart_ind = 1 THEN 1 ELSE 0 END) * 100 AS Inicios_Avon_porcent,
+--SUM(CASE WHEN revenue_nat_sd_amt> 0 AND (begin_ind = 1 OR restart_ind = 1) THEN 1 ELSE 0 END) / SUM(CASE WHEN begin_ind = 1 OR restart_ind = 1 THEN 1 ELSE 0 END) * 100 AS Inicios_Natura_porcent,
+SUM(CASE WHEN revenue_avon_fh_ss_amt > 0 AND revenue_nat_sd_amt > 0 AND (begin_ind = 1 OR restart_ind = 1) THEN 1 ELSE 0 END) / SUM(CASE WHEN begin_ind = 1 OR restart_ind = 1 THEN 1 ELSE 0 END) * 100 AS Inicios_Mutuos_porcent,
+SUM(CASE WHEN revenue_avon_fh_ss_amt > 0 AND (recovered_ind = 1) THEN 1 ELSE 0 END) AS Recuperos_Avon,
+SUM(CASE WHEN revenue_nat_sd_amt > 0 AND (recovered_ind = 1) THEN 1 ELSE 0 END) AS Recuperos_Natura,
+SUM(CASE WHEN revenue_avon_fh_ss_amt > 0 AND revenue_nat_sd_amt > 0 AND ((recovered_ind = 1)) THEN 1 ELSE 0 END) AS Recuperos_Mutuos,
+SUM(CASE WHEN revenue_avon_fh_ss_amt > 0 AND (recovered_ind = 1) THEN 1 ELSE 0 END) / SUM(CASE WHEN recovered_ind = 1 THEN 1 ELSE 0 END) * 100 AS Recuperos_Avon_porcent,
+--SUM(CASE WHEN revenue_nat_sd_amt > 0 AND (recovered_ind = 1) THEN 1 ELSE 0 END) / SUM(CASE WHEN recovered_ind = 1 THEN 1 ELSE 0 END) * 100 AS Recuperos_Natura_porcent,
+SUM(CASE WHEN revenue_avon_fh_ss_amt > 0 AND revenue_nat_sd_amt > 0 AND ((recovered_ind = 1)) THEN 1 ELSE 0 END)/ SUM(CASE WHEN recovered_ind = 1 THEN 1 ELSE 0 END) * 100 AS Recuperos_Mutuos_porcent,
+Sum(points_nat_sd_amt) AS PtosTotales_VD,
+--sum(revenue_sd_ss_amt)/Sum(points_nat_sd_amt) AS Ptos_SOL_VD,
+SUM(active_ols_ind) AS CantidadCbsVOL,
+SUM(active_ds_ols_ind) AS CantidadCBsVOLVD,
+SUM(begin_ind+restart_ind) as Inicios,
+sum(restart_ind) AS Reinicios,
+sum(case when revenue_ss_amt> 0 then recovered_ind end) AS Recuperos,
+sum(frequently_active_ind) AS ActivasFrecuentes,
+SUM(digital_space_with_sales) as EspaciosDigitalesConVta,
+sum(orders_cnt) AS PedidosTotales,
+sum(orders_ds_cnt) as PedidosVD,
+sum(orders_ols_cnt) as PedidosVOL,
+sum(items_nat_sd_amt) AS UnidadesNatura,
+sum(items_avon_ss_amt) AS UnidadesAvon,
+sum(items_fh_ss_amt) As UnidadesCyE,
+sum(items_nat_ols_amt) AS TotalUnidadNaturaVOL,
+sum(items_nat_sd_amt) AS TotalUnidadNaturaVD,
+sum(ceased_bc_ind) AS TotalCesadas,
+--SUM(active_ds_ind + active_ds_ols_ind + active_ols_ind)/SUM(active_ds_ind + active_ols_ind + active_ds_ols_ind + inactive_bc_1c_ind + inactive_bc_2c_ind + inactive_bc_3c_ind) AS Actividad
+SUM(CASE WHEN begin_ind = 1 OR restart_ind = 1 THEN 1 ELSE 0 END) AS Inicios_Reinicios,
+SUM(CASE WHEN recovered_ind = 1 THEN 1 ELSE 0 END) AS Recovered_Ind,
+sum(points_avon_fh_ss_amt) AS points_avon_fh_ss_amt
+FROM product.elo_modelo_combinado.commercial_consultant_index
+WHERE country_code = 4
+AND sales_management_code in (400001359,400001331,401000004,400001252)
+AND operational_cycle >= 202401
+GROUP BY
+Gerencia,
+Codigo_Sector,
+Nombre_Sector,
+Ciclo,
+Nivel"
+q18-ltima-estructura-comercial-de-consultoras-devuelve;Última estructura comercial de consultoras (devuelve 1 registro, el más actual);VD;"estructura_comercial AS (
+    WITH latest_business_relation AS (
+    -- Paso 1: Obtener el registro de relación de negocio más reciente por persona
+    SELECT
+        br.person_code,
+        br.structure_code AS group_code,
+        br.cycle,
+        br.business_status_code,
+        ROW_NUMBER() OVER (PARTITION BY br.person_code ORDER BY br.created_at DESC) AS rn
+    FROM
+        platform.gdp_gpp_brm_brm_replica.business_relation br
+    WHERE br.country = 152
+),
+
+latest_structure_details AS (
+    -- Paso 2: Obtener el registro de estructura más reciente para cada structure_code
+    SELECT
+        s.structure_code,
+        s.structure_name,
+        s.structure_responsible,
+        s.parent_structure_code,
+        ROW_NUMBER() OVER (PARTITION BY s.structure_code ORDER BY s.created_at DESC) AS rn
+    FROM
+        platform.gdp_gpp_cmm_cmm_replica.structure s
+    WHERE
+        s.country = 152
+        AND s.flag_deprecated = FALSE
+),
+
+consultant_with_group AS (
+    -- Paso 3: Unir consultor con su grupo más reciente
+    SELECT
+        bp.person_code,
+        bp.person_name,
+        latest_br.cycle,
+        latest_br.group_code,
+        latest_br.business_status_code
+    FROM
+        platform.gdp_gpp_brm_brm_replica.brm_person bp
+    LEFT JOIN
+        latest_business_relation latest_br ON bp.person_code = latest_br.person_code
+    WHERE
+        bp.country = 152
+        AND latest_br.rn = 1
+),
+
+group_details AS (
+    -- Paso 4: Obtener los detalles del grupo (el más reciente)
+    SELECT
+        c_group.person_code,
+        c_group.person_name,
+        c_group.cycle,
+        c_group.group_code,
+        s_group.structure_name AS nombre_grupo,
+        s_group.structure_responsible AS leader_code,
+        s_group.parent_structure_code,
+        c_group.business_status_code
+    FROM
+        consultant_with_group c_group
+    LEFT JOIN
+        latest_structure_details s_group ON c_group.group_code = s_group.structure_code
+    WHERE
+        s_group.rn = 1
+),
+
+sector_details AS (
+    -- Paso 5: Obtener los detalles del sector (el más reciente)
+    SELECT
+        g_details.*,
+        s_sector.structure_code AS codigo_sector,
+        s_sector.structure_name AS nombre_sector,
+        s_sector.structure_responsible AS gn_code,
+        s_sector.parent_structure_code AS parent_structure_code_gerencia
+    FROM
+        group_details g_details
+    LEFT JOIN
+        latest_structure_details s_sector ON g_details.parent_structure_code = s_sector.structure_code
+    WHERE
+        s_sector.rn = 1
+)
+
+-- Paso 6: Unir para obtener los detalles de la gerencia (la más reciente) y la selección final
+SELECT
+    s_details.person_code,
+    s_details.person_name,
+    s_gerencia.structure_code AS codigo_gerencia,
+    s_gerencia.structure_name AS nombre_gerencia,
+    s_gerencia.structure_responsible AS gv_code,
+    s_details.codigo_sector,
+    s_details.nombre_sector,
+    s_details.gn_code,
+    s_details.group_code,
+    s_details.nombre_grupo,
+    s_details.leader_code,
+    s_details.cycle,
+    s_details.business_status_code
+FROM
+    sector_details s_details
+LEFT JOIN
+    latest_structure_details s_gerencia ON s_details.parent_structure_code_gerencia = s_gerencia.structure_code
+WHERE
+    s_gerencia.rn = 1
+)
+
+SELECT  *
+FROM estructura_comercial"
+q20-calendario-de-ciclos-por-sector-en-chile;Calendario de Ciclos por Sector en Chile;VD;"SELECT 
+      operational_cycle AS ciclo,
+      structure_code2 AS codigo_sector,
+      structure_name_level2 AS nombre_sector,
+      cycle_date_start AS inicio_ciclo,
+      cycle_date_end AS fin_ciclo
+FROM product.elo_modelo_combinado.cmm_structure_operational_cycle
+WHERE country_name = 'CHILE' 
+AND structure_level2 = 2"
+q21-calendario-de-ciclo-por-sector-y-bloque-en-chile-b;Calendario de Ciclo por Sector y Bloque en Chile - Bloques definidos a mano y solo se disponibilizan los sectores actuales para cada código;VD;"WITH SectoresConBloque AS (
+  SELECT
+    operational_cycle AS ciclo,
+    structure_code2 AS codigo_sector,
+    structure_name_level2 AS nombre_sector,
+    CASE
+      WHEN structure_code2 IN ('200001869', '200002799', '200002761', '200002760') THEN 1
+      WHEN structure_code2 IN ('200000501', '200002736', '200001778') THEN 2
+      WHEN structure_code2 IN ('200000500', '200002796', '200001852', '200001889') THEN 3
+      WHEN structure_code2 IN ('200001851', '200002735', '200002798') THEN 4
+      WHEN structure_code2 IN ('200002465', '200001773', '200001777') THEN 5
+      WHEN structure_code2 IN ('200002291', '200002737', '200001795') THEN 6
+      WHEN structure_code2 IN ('200001853', '200002787', '200001411') THEN 7
+      WHEN structure_code2 IN ('200001779', '200002429', '200000543', '200000991') THEN 8
+      WHEN structure_code2 IN ('200001794', '200002802', '200001856', '200001369') THEN 9
+      WHEN structure_code2 IN ('200002477', '200002255', '200002467', '200002466') THEN 10
+      WHEN structure_code2 IN ('200001930', '200001509', '200001913') THEN 11
+      WHEN structure_code2 IN ('200002474', '200002472', '200002789') THEN 12
+      WHEN structure_code2 IN ('200002792', '200001849', '200002009') THEN 13
+      WHEN structure_code2 IN ('200001750', '200002252', '200001370') THEN 14
+      WHEN structure_code2 IN ('200001912', '200001796', '200002172') THEN 15
+      ELSE NULL
+    END AS bloque,
+    cycle_date_start AS inicio_ciclo_sector,
+    cycle_date_end AS fin_ciclo_sector
+  FROM
+    product.elo_modelo_combinado.cmm_structure_operational_cycle
+  WHERE
+    country_name = 'CHILE' AND structure_level2 = 2 AND version_level2 = 2
+)
+
+SELECT
+  ciclo,
+  codigo_sector,
+  nombre_sector,
+  bloque,
+  inicio_ciclo_sector,
+  fin_ciclo_sector,
+  MIN(inicio_ciclo_sector) OVER (PARTITION BY ciclo, bloque) AS inicio_ciclo_bloque,
+  MAX(fin_ciclo_sector) OVER (PARTITION BY ciclo, bloque) AS fin_ciclo_bloque
+FROM
+  SectoresConBloque"
+q22-calendario-corte-facturaci-n;Calendario Corte Facturación;VD;"WITH CTE_DuracionIndividual AS (
+    -- Paso 1: Calcular la duración individual de cada pedido en días (con decimales)
+    SELECT
+        NUMERO_PEDIDO,
+        DATA_CAPTACAO,
+        -- La lógica de duración: (DATA_ENTREGA (sin hora) + 12 horas) - DATA_CAPTACAO (con hora)
+        (
+            -- Suma 12 horas al componente de fecha de DATA_ENTREGA
+            UNIX_TIMESTAMP(CAST(DATA_ENTREGA AS DATE) + INTERVAL '12 HOURS') 
+            -- Resta el timestamp de DATA_CAPTACAO
+            - UNIX_TIMESTAMP(DATA_CAPTACAO)
+        ) / 86400.0 AS duracion_dias -- Divide por segundos en un día (86400)
+    FROM
+        platform.natura2go_chile_replica.pedido
+    WHERE
+        -- Rango de 2024, comenzando en Diciembre 2023
+        DATA_CAPTACAO >= '2023-12-01'
+        --AND DATA_CAPTACAO < '2026-01-01' 
+        AND SITUACAO_FISCAL_PEDIDO = 'Factura Emitida'
+),
+CTE_DuracionPromedio AS (
+    -- Paso 2: Calcular la duración promedio redondeada por el mes de captación
+    SELECT
+        DATE_TRUNC('MONTH', DATA_CAPTACAO) AS mes_captacao,
+        -- Forzar el tipo a INTEGER para DATE_SUB
+        CAST(ROUND(AVG(duracion_dias)) AS INT) AS promedio_duracion
+    FROM
+        CTE_DuracionIndividual
+    GROUP BY
+        1
+)
+-- Consulta Final: Calcular inicio_mes, fin_mes ajustados, año y mes secuencial para 2024
+SELECT
+    -- Nuevo: Año
+    YEAR(dp.mes_captacao) AS year_calendar, 
+    -- Nuevo: Mes secuencial (1 a 12)
+    MONTH(dp.mes_captacao) AS month_calendar, 
+    -- Nombre del Mes
+    DATE_FORMAT(dp.mes_captacao, 'MMMM') AS nombre_mes,
+    dp.promedio_duracion,
+    -- Inicio del Mes: El fin del mes anterior ajustado + 1 día
+    DATE_ADD(
+        LAG(
+            DATE_SUB(LAST_DAY(dp.mes_captacao), dp.promedio_duracion), 
+            1, 
+            -- Ajustado: Valor inicial para Diciembre 2023 (se toma el fin de Nov 2023 ajustado, lo fijamos aquí)
+            -- '2023-11-30' + 1 día = 2023-12-01, que es el inicio del primer periodo de cálculo
+            CAST(DATE_SUB('2023-12-01', 1) AS DATE)
+        ) OVER (ORDER BY dp.mes_captacao), 
+        1
+    ) AS inicio_mes_ajustado,
+    -- Fin del Mes Ajustado: Último día del mes - promedio_duracion días
+    DATE_SUB(LAST_DAY(dp.mes_captacao), dp.promedio_duracion) AS fin_mes_ajustado
+FROM
+    CTE_DuracionPromedio dp
+-- Ajustado: Filtramos para mostrar solo los resultados de Enero 2024 en adelante
+WHERE
+    dp.mes_captacao >= '2024-01-01'
+ORDER BY
+    dp.mes_captacao;"
+q23-calendario-corte-facturaci-n;Calendario Corte Facturación;VOL;"WITH CTE_DuracionIndividual AS (
+    -- Paso 1: Calcular la duración individual de cada pedido en días (con decimales)
+    SELECT
+        NUMERO_PEDIDO,
+        DATA_CAPTACAO,
+        -- La lógica de duración: (DATA_ENTREGA (sin hora) + 12 horas) - DATA_CAPTACAO (con hora)
+        (
+            -- Suma 12 horas al componente de fecha de DATA_ENTREGA
+            UNIX_TIMESTAMP(CAST(DATA_ENTREGA AS DATE) + INTERVAL '12 HOURS') 
+            -- Resta el timestamp de DATA_CAPTACAO
+            - UNIX_TIMESTAMP(DATA_CAPTACAO)
+        ) / 86400.0 AS duracion_dias -- Divide por segundos en un día (86400)
+    FROM
+        platform.natura2go_chile_replica.pedido
+    WHERE
+        -- Rango de 2024, comenzando en Diciembre 2023
+        DATA_CAPTACAO >= '2023-12-01'
+        --AND DATA_CAPTACAO < '2026-01-01' 
+        AND SITUACAO_FISCAL_PEDIDO = 'Factura Emitida'
+),
+CTE_DuracionPromedio AS (
+    -- Paso 2: Calcular la duración promedio redondeada por el mes de captación
+    SELECT
+        DATE_TRUNC('MONTH', DATA_CAPTACAO) AS mes_captacao,
+        -- Forzar el tipo a INTEGER para DATE_SUB
+        CAST(ROUND(AVG(duracion_dias)) AS INT) AS promedio_duracion
+    FROM
+        CTE_DuracionIndividual
+    GROUP BY
+        1
+)
+-- Consulta Final: Calcular inicio_mes, fin_mes ajustados, año y mes secuencial para 2024
+SELECT
+    -- Nuevo: Año
+    YEAR(dp.mes_captacao) AS year_calendar, 
+    -- Nuevo: Mes secuencial (1 a 12)
+    MONTH(dp.mes_captacao) AS month_calendar, 
+    -- Nombre del Mes
+    DATE_FORMAT(dp.mes_captacao, 'MMMM') AS nombre_mes,
+    dp.promedio_duracion,
+    -- Inicio del Mes: El fin del mes anterior ajustado + 1 día
+    DATE_ADD(
+        LAG(
+            DATE_SUB(LAST_DAY(dp.mes_captacao), dp.promedio_duracion), 
+            1, 
+            -- Ajustado: Valor inicial para Diciembre 2023 (se toma el fin de Nov 2023 ajustado, lo fijamos aquí)
+            -- '2023-11-30' + 1 día = 2023-12-01, que es el inicio del primer periodo de cálculo
+            CAST(DATE_SUB('2023-12-01', 1) AS DATE)
+        ) OVER (ORDER BY dp.mes_captacao), 
+        1
+    ) AS inicio_mes_ajustado,
+    -- Fin del Mes Ajustado: Último día del mes - promedio_duracion días
+    DATE_SUB(LAST_DAY(dp.mes_captacao), dp.promedio_duracion) AS fin_mes_ajustado
+FROM
+    CTE_DuracionPromedio dp
+-- Ajustado: Filtramos para mostrar solo los resultados de Enero 2024 en adelante
+WHERE
+    dp.mes_captacao >= '2024-01-01'
+ORDER BY
+    dp.mes_captacao;"
