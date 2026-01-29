@@ -5,6 +5,12 @@ Proyecto "Data Hub": una pequeña aplicación full-stack que combina un cliente 
 ## Descripción
 
 Esta codebase implementa un prototipo de panel de datos donde el frontend (cliente) está construido con React y Vite y el backend es un servidor Node.js ligero. Los datos iniciales están en CSV (`data/dashboards.csv`, `data/queries.csv`) y se consumen en la interfaz para mostrar dashboards, consultas y detalles relacionados.
+<img width="1392" height="905" alt="image" src="https://github.com/user-attachments/assets/cfcdf0aa-f7ba-42d6-8238-bcfaddd3afdf" />
+<img width="1431" height="882" alt="image" src="https://github.com/user-attachments/assets/590ccda2-1533-43c8-a417-952c7131db0c" />
+<img width="1622" height="910" alt="image" src="https://github.com/user-attachments/assets/a6ca52b9-4483-4dd8-8b1c-15729afb6513" />
+
+
+
 
 **Características principales**
 
